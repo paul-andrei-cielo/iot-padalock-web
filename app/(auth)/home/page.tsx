@@ -23,17 +23,8 @@ interface OverviewStats {
 const navItems = [
   { label: "REGISTER", href: "/register" },
   { label: "ACTIVITY", href: "/activity" },
-  { label: "NOTIFICATIONS", href: "/notifications" },
   { label: "ACCOUNT", href: "/account" },
 ];
-
-const scrollbarClass =
-  "[&::-webkit-scrollbar]:w-2.5 " +
-  "[&::-webkit-scrollbar-track]:bg-[#f2d9e2] " +
-  "[&::-webkit-scrollbar-track]:rounded-full " +
-  "[&::-webkit-scrollbar-thumb]:bg-[#d985a1] " +
-  "[&::-webkit-scrollbar-thumb]:rounded-full " +
-  "hover:[&::-webkit-scrollbar-thumb]:bg-[#cf6c91]";
 
 export default function HomePage() {
   const router = useRouter();
@@ -136,8 +127,8 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[2.2fr_0.95fr]">
-          <div className="flex min-h-0 flex-col rounded-[2rem] bg-white/25 p-4 backdrop-blur-sm sm:p-5 md:p-6">
+        <section className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 w-full flex-col rounded-[2rem] bg-white/25 p-4 backdrop-blur-sm sm:p-5 md:p-6">
             <div className="mb-4 flex shrink-0 items-center justify-between">
               <h2 className="text-xl font-extrabold text-white md:text-2xl">
                 Overview
@@ -196,47 +187,6 @@ export default function HomePage() {
               </div>
             )}
           </div>
-
-          <aside className="flex min-h-0 flex-col rounded-[2rem] bg-white/25 p-4 backdrop-blur-sm sm:p-5 md:p-6">
-            <h2 className="mb-4 shrink-0 text-xl font-extrabold text-white md:text-2xl">
-              Recent
-            </h2>
-
-            <div className={`min-h-0 flex-1 overflow-y-auto rounded-[1.5rem] bg-white/35 p-3 pr-2 ${scrollbarClass}`}>
-              <div className="flex flex-col gap-3">
-                {[
-                  ["📦", "Delivered", "(3 Parcel/s)", "Today, 3:10 PM"],
-                  ["📦", "Retrieved", "(1 Parcel/s)", "March 23, 2:14 PM"],
-                  ["❗", "Failed PIN Attempt", "", "March 22, 6:02 PM"],
-                ].map(([icon, title, extra, time]) => (
-                  <div
-                    key={`${title}-${time}`}
-                    className="flex items-start gap-3 rounded-[1.25rem] bg-white/55 px-4 py-3"
-                  >
-                    <span
-                      className={`text-xl ${
-                        title === "Failed PIN Attempt"
-                          ? "text-red-500"
-                          : "text-[#df4473]"
-                      }`}
-                    >
-                      {icon}
-                    </span>
-
-                    <div className="min-w-0 text-[#df4473]">
-                      <p className="text-sm font-extrabold md:text-base">
-                        {title}{" "}
-                        {extra && (
-                          <span className="italic font-medium">{extra}</span>
-                        )}
-                      </p>
-                      <p className="text-xs md:text-sm">{time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
         </section>
       </div>
     </main>
