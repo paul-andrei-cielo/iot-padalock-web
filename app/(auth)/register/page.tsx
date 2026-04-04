@@ -51,7 +51,7 @@ export default function RegisterPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-
+      
       if (!token) {
         setError("No authentication token found");
         setParcels([]);
@@ -97,6 +97,11 @@ export default function RegisterPage() {
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        setError("No authentication token found");
+        return;
+      }
+
       const res = await fetch(API_BASE, {
         method: "POST",
         headers: {
@@ -145,6 +150,11 @@ export default function RegisterPage() {
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        setError("No authentication token found");
+        return;
+      }
+
       const res = await fetch(`${API_BASE}/${parcelId}`, {
         method: "PUT",
         headers: {
@@ -186,6 +196,11 @@ export default function RegisterPage() {
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        setError("No authentication token found");
+        return;
+      }
+
       const res = await fetch(`${API_BASE}/${parcelId}`, {
         method: "DELETE",
         headers: {
@@ -194,13 +209,14 @@ export default function RegisterPage() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to delete parcel");
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete parcel");
       }
 
       await fetchParcels();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Delete error:", err);
-      alert("Failed to delete parcel");
+      setError("Failed to delete parcel");
       await fetchParcels();
     }
   };

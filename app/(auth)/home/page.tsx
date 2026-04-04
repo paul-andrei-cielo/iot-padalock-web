@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 interface Parcel {
@@ -37,21 +37,17 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchOverviewStats();
-  }, []);
-
-  const fetchOverviewStats = async () => {
+  const fetchOverviewStats = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token = typeof window !== 'undefined' ? localStorage.getItem("token") : null;
 
       if (!token) {
         console.log("No token, redirecting to login...");
         router.push("/login");
+        router.refresh();
         return;
       }
 
@@ -65,7 +61,8 @@ export default function HomePage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to fetch parcels");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch parcels");
       }
 
       const parcels: Parcel[] = await response.json();
@@ -89,13 +86,17 @@ export default function HomePage() {
       );
 
       setStats(stats);
-    } catch (err) {
-      setError("Failed to load parcel stats");
+    } catch (err: any) {
+      setError(err.message || "Failed to load parcel stats");
       console.error("Error fetching parcels:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    fetchOverviewStats();
+  }, [fetchOverviewStats]);
 
   const formatNumber = (num: number) => num.toString().padStart(2, "0");
 
@@ -136,19 +137,40 @@ export default function HomePage() {
               <button
                 onClick={fetchOverviewStats}
                 disabled={loading}
-                className="rounded-full bg-white/30 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/40 disabled:opacity-50 md:text-base"
+                className="rounded-full bg-white/30 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/40 disabled:opacity-50 disabled:cursor-not-allowed md:text-base flex items-center justify-center"
+                title={loading ? "Loading..." : "Refresh stats"}
               >
-                {loading ? "⟳" : "↻"}
+                {loading ? (
+                  <span className="animate-spin">⟳</span>
+                ) : (
+                  "↻"
+                )}
               </button>
             </div>
 
             {error ? (
               <div className="flex flex-1 items-center justify-center rounded-[1.5rem] bg-white/30 p-6">
-                <p className="text-center text-sm text-white/80">{error}</p>
+                <div className="text-center">
+                  <p className="text-sm text-white/80 mb-2">{error}</p>
+                  <button
+                    onClick={fetchOverviewStats}
+                    disabled={loading}
+                    className="rounded-full bg-white/50 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/70 disabled:opacity-50"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            ) : loading ? (
+              <div className="flex flex-1 items-center justify-center rounded-[1.5rem] bg-white/30 p-6">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                  <p className="text-sm text-white/80">Loading stats...</p>
+                </div>
               </div>
             ) : (
               <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-1 md:grid-cols-3">
-                <div className="flex min-h-[170px] flex-col rounded-[1.5rem] bg-white/50 p-4 transition hover:scale-[1.02] md:p-5">
+                <div className="group flex min-h-[170px] flex-col rounded-[1.5rem] bg-white/50 p-4 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl md:p-5">
                   <h3 className="text-center text-base font-extrabold text-[#df4473] md:text-lg lg:text-xl">
                     Pending
                   </h3>
@@ -159,7 +181,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="flex min-h-[170px] flex-col rounded-[1.5rem] bg-white/50 p-4 transition hover:scale-[1.02] md:p-5">
+                <div className="group flex min-h-[170px] flex-col rounded-[1.5rem] bg-white/50 p-4 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl md:p-5">
                   <h3 className="text-center text-base font-extrabold text-[#df4473] md:text-lg lg:text-xl">
                     Delivered
                   </h3>
@@ -170,7 +192,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="flex min-h-[170px] flex-col rounded-[1.5rem] bg-white/50 p-4 transition hover:scale-[1.02] md:p-5">
+                <div className="group flex min-h-[170px] flex-col rounded-[1.5rem] bg-white/50 p-4 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl md:p-5">
                   <h3 className="text-center text-base font-extrabold text-[#df4473] md:text-lg lg:text-xl">
                     Retrieved
                   </h3>
@@ -178,7 +200,7 @@ export default function HomePage() {
                     <p className="text-5xl font-light text-[#df4473] md:text-6xl lg:text-7xl">
                       {formatNumber(stats.retrieved)}
                     </p>
-                    <div className="mt-2 flex w-full max-w-[120px] items-center justify-between rounded-full bg-white/50 px-3 py-1 text-xs text-[#df4473]">
+                    <div className="mt-2 flex w-full max-w-[120px] items-center justify-between rounded-full bg-white/50 px-3 py-1 text-xs text-[#df4473] group-hover:bg-white/70 transition-all">
                       <span>Today</span>
                       <span>˅</span>
                     </div>

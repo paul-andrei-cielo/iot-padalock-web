@@ -9,16 +9,37 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-  
-    setTimeout(() => {
-      localStorage.setItem("token", "dummy-token");
+    setError("");
+
+    try {
+      const response = await fetch('/api/users/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      localStorage.setItem("token", data.token);
+      
       router.push("/home");
-    }, 800);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,6 +71,12 @@ export default function Home() {
         <section className="flex w-full max-w-xl justify-center lg:justify-end">
           <div className="w-full rounded-[2rem] bg-[#f6e8ec]/50 p-8 shadow-[0_20px_60px_rgba(214,84,126,0.18)] backdrop-blur-sm md:p-10">
             <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <div className="rounded-full bg-[#fee2e2]/80 p-4 text-center text-sm text-[#dc2626]">
+                  {error}
+                </div>
+              )}
+              
               <div>
                 <label
                   htmlFor="email"
@@ -64,7 +91,8 @@ export default function Home() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="user@example.com"
                   required
-                  className="h-14 w-full rounded-full border-none bg-[#f8f4f5] px-6 text-lg text-[#db416a] outline-none placeholder:text-[#e79baf] focus:ring-2 focus:ring-[#e33e70]"
+                  disabled={loading}
+                  className="h-14 w-full rounded-full border-none bg-[#f8f4f5] px-6 text-lg text-[#db416a] outline-none placeholder:text-[#e79baf] focus:ring-2 focus:ring-[#e33e70] disabled:opacity-50"
                 />
               </div>
 
@@ -82,7 +110,8 @@ export default function Home() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Your password"
                   required
-                  className="h-14 w-full rounded-full border-none bg-[#f8f4f5] px-6 text-lg text-[#db416a] outline-none placeholder:text-[#e79baf] focus:ring-2 focus:ring-[#e33e70]"
+                  disabled={loading}
+                  className="h-14 w-full rounded-full border-none bg-[#f8f4f5] px-6 text-lg text-[#db416a] outline-none placeholder:text-[#e79baf] focus:ring-2 focus:ring-[#e33e70] disabled:opacity-50"
                 />
                 <p className="mt-2 text-center text-sm text-[#db416a]">
                   <Link href="/forgot-password" className="hover:underline">
