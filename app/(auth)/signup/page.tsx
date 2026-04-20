@@ -44,7 +44,8 @@ export default function SignupPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
           email: formData.email.trim(),
           password: formData.password,
         }),

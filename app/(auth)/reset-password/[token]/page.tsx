@@ -1,26 +1,45 @@
 "use client";
 
 import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
-export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+export default function ResetPassword() {
+  const { token } = useParams();
+  const router = useRouter();
+
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (password !== confirmPassword) {
+      setMessage("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      setMessage("Password must be at least 6 characters long");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
     try {
-      const res = await fetch("/api/users/forgot-password", {
+      const res = await fetch("/api/users/reset-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          password,
+          token,
+        }),
       });
 
       const data = await res.json();
@@ -30,8 +49,12 @@ export default function ForgotPassword() {
         return;
       }
 
-      setMessage("Reset link sent! Check your email.");
-      setEmail("");
+      setMessage("Password reset successful!");
+
+      setTimeout(() => {
+        router.push("/login");
+      }, 2000);
+
     } catch (err) {
       console.error(err);
       setMessage("Server error. Please try again.");
@@ -58,45 +81,60 @@ export default function ForgotPassword() {
 
           <div className="max-w-md">
             <h2 className="text-4xl font-extrabold leading-[1.2] md:text-5xl">
-              Forgot your
+              Reset your
               <br />
-              password?
+              password
             </h2>
           </div>
         </section>
 
         <section className="flex w-full max-w-xl justify-center lg:justify-end">
           <div className="w-full rounded-[2rem] bg-[#f6e8ec]/50 p-8 shadow-[0_20px_60px_rgba(214,84,126,0.18)] backdrop-blur-sm md:p-10">
-
             <form className="space-y-6" onSubmit={handleSubmit}>
               
               <div>
                 <label
-                  htmlFor="email"
+                  htmlFor="password"
                   className="mb-2 block text-lg font-medium text-[#e34774]"
                 >
-                  Email
+                  New Password
                 </label>
-
                 <input
-                  id="email"
-                  type="email"
-                  placeholder="user@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="password"
+                  type="password"
+                  placeholder="Enter new password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-14 w-full rounded-full border-none bg-[#f8f4f5] px-6 text-lg text-[#dd8ea5] outline-none placeholder:text-[#dd9db0]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="confirmPassword"
+                  className="mb-2 block text-lg font-medium text-[#e34774]"
+                >
+                  Confirm Password
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   className="h-14 w-full rounded-full border-none bg-[#f8f4f5] px-6 text-lg text-[#dd8ea5] outline-none placeholder:text-[#dd9db0]"
                   required
                 />
               </div>
 
               <div className="flex flex-col items-center gap-4">
-
                 <button
                   type="submit"
                   disabled={loading}
                   className="h-12 min-w-[170px] rounded-full bg-[#e33e70] px-6 text-lg font-bold text-white transition hover:scale-[1.02] disabled:opacity-50"
                 >
-                  {loading ? "Sending..." : "Send Reset Link"}
+                  {loading ? "Resetting..." : "Reset Password"}
                 </button>
 
                 {message && (
@@ -111,13 +149,10 @@ export default function ForgotPassword() {
                     Back to login
                   </Link>
                 </p>
-
               </div>
             </form>
-
           </div>
         </section>
-
       </div>
     </main>
   );
