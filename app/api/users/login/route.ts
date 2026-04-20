@@ -14,6 +14,13 @@ export async function POST(req: Request) {
             return Response.json({ error: "User not found" }, { status: 404 });
         }
 
+        if (user.isDeleted) {
+            return Response.json(
+                { error: "This account has been deleted" },
+                { status: 403 }
+            );
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if(!isMatch) {
             return Response.json({ error: "Invalid credentials" }, { status: 401 });
