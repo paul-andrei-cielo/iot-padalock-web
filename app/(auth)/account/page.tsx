@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   Pencil,
@@ -28,13 +28,118 @@ const scrollbarClass =
   "[&::-webkit-scrollbar-thumb]:rounded-full " +
   "hover:[&::-webkit-scrollbar-thumb]:bg-[#cf6c91]";
 
+interface UserProfile {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 export default function AccountPage() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const [showChangePinCard, setShowChangePinCard] = useState(false);
   const [showCurrentPin, setShowCurrentPin] = useState(false);
   const [showOldPin, setShowOldPin] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [showNewPin, setShowNewPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      setError("");
+      const response = await fetch("/api/users/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch profile");
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+      
+      if (data.user) {
+        setEditFirstName(data.user.firstName);
+        setEditLastName(data.user.lastName);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to load profile");
+      console.error("Profile fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditProfile = () => {
+    setEditingProfile(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProfile(false);
+    if (user) {
+      setEditFirstName(user.firstName);
+      setEditLastName(user.lastName);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editFirstName.trim() || !editLastName.trim()) {
+      alert("First name and last name are required");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/users/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          firstName: editFirstName.trim(),
+          lastName: editLastName.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update profile");
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+      setEditingProfile(false);
+      alert("Profile updated successfully!");
+    } catch (err: any) {
+      alert(err.message || "Failed to update profile");
+      console.error("Profile update error:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <main className="h-screen bg-gradient-to-b from-[#df4473] via-[#e99ab1] to-[#f4eff1] flex items-center justify-center">
+        <div className="text-white text-xl font-extrabold animate-pulse">Loading profile...</div>
+      </main>
+    );
+  }
 
   return (
     <main className="h-screen overflow-hidden bg-gradient-to-b from-[#df4473] via-[#e99ab1] to-[#f4eff1] px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6">
@@ -53,7 +158,6 @@ export default function AccountPage() {
             <nav className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium text-white sm:text-sm md:text-base lg:justify-end lg:gap-x-6 lg:text-lg">
               {navItems.map((item) => {
                 const isActive = item.label === "ACCOUNT";
-
                 return (
                   <Link
                     key={item.label}
@@ -85,6 +189,7 @@ export default function AccountPage() {
 
             <div className={`min-h-0 flex-1 overflow-y-auto pr-1 ${scrollbarClass}`}>
               <div className="flex flex-col gap-4 pb-1">
+                {/* Profile Information Card */}
                 <div className="rounded-[1.75rem] bg-white/45 p-4 md:p-5">
                   <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-3">
@@ -96,42 +201,103 @@ export default function AccountPage() {
                       </h2>
                     </div>
 
-                    <button className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#de517e] px-5 py-2 text-sm font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-base">
-                      <Pencil className="h-4 w-4" />
-                      Edit Profile
-                    </button>
+                    {!editingProfile ? (
+                      <button
+                        onClick={handleEditProfile}
+                        className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#de517e] px-5 py-2 text-sm font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-base"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit Profile
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleCancelEdit}
+                          disabled={saving}
+                          className="rounded-full border-2 border-[#de517e] px-5 py-2 text-sm font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-base disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveProfile}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center gap-2 rounded-full bg-[#de517e] px-6 py-2 text-sm font-extrabold text-white transition hover:opacity-90 md:text-base disabled:opacity-50"
+                        >
+                          {saving ? (
+                            <>
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent md:h-5 md:w-5" />
+                              Saving...
+                            </>
+                          ) : (
+                            "Save"
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr]">
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
-                        First Name
-                      </label>
-                      <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
-                        Sophie Ella
-                      </div>
+                  {error ? (
+                    <div className="rounded-full bg-red-100/80 p-6 text-center text-red-800">
+                      <p className="text-lg font-semibold mb-2">{error}</p>
+                      <button
+                        onClick={fetchUserProfile}
+                        className="inline-flex items-center gap-2 rounded-full bg-red-500 px-6 py-2.5 text-sm font-extrabold text-white transition hover:bg-red-600"
+                      >
+                        Retry
+                      </button>
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr]">
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
+                          First Name
+                        </label>
+                        {editingProfile ? (
+                          <input
+                            type="text"
+                            value={editFirstName}
+                            onChange={(e) => setEditFirstName(e.target.value)}
+                            className="w-full rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] outline-none focus:border-2 focus:border-[#de517e] focus:ring-0 md:text-lg"
+                            autoFocus
+                          />
+                        ) : (
+                          <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
+                            {user?.firstName || "N/A"}
+                          </div>
+                        )}
+                      </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
-                        Last Name
-                      </label>
-                      <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
-                        Mausisa
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
+                          Last Name
+                        </label>
+                        {editingProfile ? (
+                          <input
+                            type="text"
+                            value={editLastName}
+                            onChange={(e) => setEditLastName(e.target.value)}
+                            className="w-full rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] outline-none focus:border-2 focus:border-[#de517e] focus:ring-0 md:text-lg"
+                          />
+                        ) : (
+                          <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
+                            {user?.lastName || "N/A"}
+                          </div>
+                        )}
                       </div>
-                    </div>
 
-                    <div className="md:col-span-2 xl:col-span-1">
-                      <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
-                        Email
-                      </label>
-                      <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg break-all">
-                        user@example.com
+                      <div className="md:col-span-2 xl:col-span-1">
+                        <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
+                          Email
+                        </label>
+                        <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg break-all">
+                          {user?.email || "N/A"}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
+                {/* Locker PIN Card */}
                 <div className="rounded-[1.75rem] bg-white/45 p-4 md:p-5">
                   <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-3">
@@ -188,6 +354,7 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                {/* Change PIN Card */}
                 {showChangePinCard && (
                   <div className="rounded-[1.75rem] bg-[#e7b8c8]/85 p-4 md:p-5">
                     <div className="mb-5 flex items-center gap-3">
@@ -362,6 +529,7 @@ export default function AccountPage() {
                   </div>
                 )}
 
+                {/* Account Deletion Card */}
                 <div className="rounded-[1.75rem] bg-[#f28a92]/95 p-4 md:p-5">
                   <div className="mb-5 flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#ef1f1f]">
