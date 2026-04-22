@@ -48,6 +48,10 @@ export default function AccountPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteEmail, setDeleteEmail] = useState("");
 
+  // Locker state
+  const [locker, setLocker] = useState<any>(null);
+  const [lockerLoading, setLockerLoading] = useState(true);
+
   const [showChangePinCard, setShowChangePinCard] = useState(false);
   const [showCurrentPin, setShowCurrentPin] = useState(false);
   const [showOldPin, setShowOldPin] = useState(false);
@@ -55,9 +59,35 @@ export default function AccountPage() {
   const [showNewPin, setShowNewPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
 
+  // Change PIN state
+  const [currentPin, setCurrentPin] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [updatingPin, setUpdatingPin] = useState(false);
+  const [step, setStep] = useState(1); // 1: current PIN, 2: verification, 3: new PIN, 4: confirm
+
   useEffect(() => {
-    fetchUserProfile();
+    const fetchData = async () => {
+      await Promise.all([fetchUserProfile(), fetchLocker()]);
+    };
+    fetchData();
   }, []);
+
+  // Reset form when toggling change PIN card
+  useEffect(() => {
+    if (!showChangePinCard) {
+      setStep(1);
+      setCurrentPin("");
+      setVerificationCode("");
+      setNewPin("");
+      setConfirmPin("");
+      setCodeSent(false);
+      setCodeVerified(false);
+    }
+  }, [showChangePinCard]);
 
   const fetchUserProfile = async () => {
     try {
@@ -84,6 +114,145 @@ export default function AccountPage() {
       console.error("Profile fetch error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLocker = async () => {
+    try {
+      setLockerLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/locker", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch locker");
+      }
+
+      const data = await response.json();
+      setLocker(data.length > 0 ? data[0] : null);
+    } catch (err: any) {
+      console.error("Locker fetch error:", err);
+      setLocker(null);
+    } finally {
+      setLockerLoading(false);
+    }
+  };
+
+  const formatPinDisplay = (pin: string | number | undefined) => {
+    if (!pin) return "••••";
+    return pin.toString().padStart(4, "0");
+  };
+
+  // Change PIN handlers
+  const handleVerifyCurrentPin = async () => {
+    if (currentPin !== locker?.pin) {
+      alert("Current PIN is incorrect");
+      return;
+    }
+    setStep(2);
+  };
+
+  const handleSendVerificationCode = async () => {
+    try {
+      setUpdatingPin(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/users/send-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to send code");
+      }
+
+      setCodeSent(true);
+      alert("Verification code sent to your email!");
+    } catch (err: any) {
+      alert(err.message || "Failed to send verification code");
+    } finally {
+      setUpdatingPin(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    try {
+      setUpdatingPin(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/users/verify-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: verificationCode }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Invalid code");
+      }
+
+      setCodeVerified(true);
+      setStep(3);
+    } catch (err: any) {
+      alert(err.message || "Invalid verification code");
+    } finally {
+      setUpdatingPin(false);
+    }
+  };
+
+  const handleResendCode = () => {
+    setVerificationCode("");
+    handleSendVerificationCode();
+  };
+
+  const handleUpdatePin = async () => {
+    if (newPin.length !== 4 || confirmPin.length !== 4 || newPin !== confirmPin) {
+      alert("Please enter matching 4-digit PINs");
+      return;
+    }
+
+    try {
+      setUpdatingPin(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/locker", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: locker?._id,
+          pin: newPin,
+          pinChanged: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update PIN");
+      }
+
+      const data = await response.json();
+      setLocker(data);
+      setShowChangePinCard(false);
+      setStep(1);
+      setCurrentPin("");
+      setVerificationCode("");
+      setNewPin("");
+      setConfirmPin("");
+      setCodeSent(false);
+      setCodeVerified(false);
+      alert("PIN updated successfully!");
+    } catch (err: any) {
+      alert(err.message || "Failed to update PIN");
+    } finally {
+      setUpdatingPin(false);
     }
   };
 
@@ -244,112 +413,112 @@ export default function AccountPage() {
               <div className={`min-h-0 flex-1 overflow-y-auto pr-1 ${scrollbarClass}`}>
                 <div className="flex flex-col gap-4 pb-1">
                   {/* Profile Information Card */}
-                <div className="rounded-[1.75rem] bg-white/45 p-4 md:p-5">
-                  <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#de517e] text-white">
-                        <User className="h-5 w-5" />
+                  <div className="rounded-[1.75rem] bg-white/45 p-4 md:p-5">
+                    <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#de517e] text-white">
+                          <User className="h-5 w-5" />
+                        </div>
+                        <h2 className="text-xl font-extrabold text-[#de517e] md:text-2xl">
+                          Profile Information
+                        </h2>
                       </div>
-                      <h2 className="text-xl font-extrabold text-[#de517e] md:text-2xl">
-                        Profile Information
-                      </h2>
+
+                      {!editingProfile ? (
+                        <button
+                          onClick={handleEditProfile}
+                          className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#de517e] px-5 py-2 text-sm font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-base"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit Profile
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={saving}
+                            className="rounded-full border-2 border-[#de517e] px-5 py-2 text-sm font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-base disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveProfile}
+                            disabled={saving}
+                            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#de517e] px-6 py-2 text-sm font-extrabold text-white transition hover:opacity-90 md:text-base disabled:opacity-50"
+                          >
+                            {saving ? (
+                              <>
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent md:h-5 md:w-5" />
+                                Saving...
+                              </>
+                            ) : (
+                              "Save"
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {!editingProfile ? (
-                      <button
-                        onClick={handleEditProfile}
-                        className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#de517e] px-5 py-2 text-sm font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-base"
-                      >
-                        <Pencil className="h-4 w-4" />
-                        Edit Profile
-                      </button>
+                    {error ? (
+                      <div className="rounded-full bg-red-100/80 p-6 text-center text-red-800">
+                        <p className="text-lg font-semibold mb-2">{error}</p>
+                        <button
+                          onClick={fetchUserProfile}
+                          className="inline-flex items-center gap-2 rounded-full bg-red-500 px-6 py-2.5 text-sm font-extrabold text-white transition hover:bg-red-600"
+                        >
+                          Retry
+                        </button>
+                      </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleCancelEdit}
-                          disabled={saving}
-                          className="rounded-full border-2 border-[#de517e] px-5 py-2 text-sm font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-base disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSaveProfile}
-                          disabled={saving}
-                          className="inline-flex items-center justify-center gap-2 rounded-full bg-[#de517e] px-6 py-2 text-sm font-extrabold text-white transition hover:opacity-90 md:text-base disabled:opacity-50"
-                        >
-                          {saving ? (
-                            <>
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent md:h-5 md:w-5" />
-                              Saving...
-                            </>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr]">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
+                            First Name
+                          </label>
+                          {editingProfile ? (
+                            <input
+                              type="text"
+                              value={editFirstName}
+                              onChange={(e) => setEditFirstName(e.target.value)}
+                              className="w-full rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] outline-none focus:border-2 focus:border-[#de517e] focus:ring-0 md:text-lg"
+                              autoFocus
+                            />
                           ) : (
-                            "Save"
+                            <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
+                              {user?.firstName || "N/A"}
+                            </div>
                           )}
-                        </button>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
+                            Last Name
+                          </label>
+                          {editingProfile ? (
+                            <input
+                              type="text"
+                              value={editLastName}
+                              onChange={(e) => setEditLastName(e.target.value)}
+                              className="w-full rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] outline-none focus:border-2 focus:border-[#de517e] focus:ring-0 md:text-lg"
+                            />
+                          ) : (
+                            <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
+                              {user?.lastName || "N/A"}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="md:col-span-2 xl:col-span-1">
+                          <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
+                            Email
+                          </label>
+                          <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg break-all">
+                            {user?.email || "N/A"}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {error ? (
-                    <div className="rounded-full bg-red-100/80 p-6 text-center text-red-800">
-                      <p className="text-lg font-semibold mb-2">{error}</p>
-                      <button
-                        onClick={fetchUserProfile}
-                        className="inline-flex items-center gap-2 rounded-full bg-red-500 px-6 py-2.5 text-sm font-extrabold text-white transition hover:bg-red-600"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr]">
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
-                          First Name
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="text"
-                            value={editFirstName}
-                            onChange={(e) => setEditFirstName(e.target.value)}
-                            className="w-full rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] outline-none focus:border-2 focus:border-[#de517e] focus:ring-0 md:text-lg"
-                            autoFocus
-                          />
-                        ) : (
-                          <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
-                            {user?.firstName || "N/A"}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
-                          Last Name
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="text"
-                            value={editLastName}
-                            onChange={(e) => setEditLastName(e.target.value)}
-                            className="w-full rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] outline-none focus:border-2 focus:border-[#de517e] focus:ring-0 md:text-lg"
-                          />
-                        ) : (
-                          <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg">
-                            {user?.lastName || "N/A"}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="md:col-span-2 xl:col-span-1">
-                        <label className="mb-2 block text-sm font-semibold text-[#de517e] md:text-base">
-                          Email
-                        </label>
-                        <div className="rounded-full bg-[#f6f1f3] px-5 py-3 text-base text-[#d695aa] md:text-lg break-all">
-                          {user?.email || "N/A"}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
 
                   {/* Locker PIN Card */}
                   <div className="rounded-[1.75rem] bg-white/45 p-4 md:p-5">
@@ -363,53 +532,77 @@ export default function AccountPage() {
                         </h2>
                       </div>
 
-                      <button
-                        onClick={() => setShowChangePinCard((prev) => !prev)}
-                        className={`inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-extrabold transition md:text-base ${
-                          showChangePinCard
-                            ? "bg-[#de517e] text-white hover:opacity-90"
-                            : "border-2 border-[#de517e] text-[#de517e] hover:bg-[#de517e] hover:text-white"
-                        }`}
-                      >
-                        {showChangePinCard ? "Save Changes" : "Update PIN"}
-                      </button>
+                      {(!editingProfile && lockerLoading) ? (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#de517e]/50 border-t-[#de517e] md:h-8 md:w-8" />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowChangePinCard((prev) => !prev)}
+                          disabled={lockerLoading || updatingPin}
+                          className={`inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-extrabold transition md:text-base ${
+                            showChangePinCard
+                              ? "bg-[#de517e] text-white hover:opacity-90"
+                              : "border-2 border-[#de517e] text-[#de517e] hover:bg-[#de517e] hover:text-white"
+                          } ${lockerLoading || updatingPin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {showChangePinCard ? "Cancel" : "Update PIN"}
+                        </button>
+                      )}
                     </div>
 
-                    <div className="rounded-[1.5rem] bg-[#f3dfd0] px-4 py-4 md:px-5">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="min-w-0">
-                          <h3 className="text-xl font-extrabold text-[#d46a1a] md:text-2xl">
-                            Current PIN
-                          </h3>
-                          <p className="text-sm text-[#d46a1a] md:text-base">
-                            Used to open the PadaBox for parcel retrieval.
-                          </p>
-                        </div>
+                    {!lockerLoading && !locker && (
+                      <div className="text-center py-12 text-[#d46a1a]/80">
+                        <LockKeyhole className="mx-auto h-16 w-16 mb-4 opacity-50" />
+                        <p className="text-xl font-semibold mb-2">No locker assigned</p>
+                        <p className="text-base">Create a locker to set up your PIN</p>
+                      </div>
+                    )}
 
-                        <div className="relative w-full lg:max-w-[320px]">
-                          <input
-                            type={showCurrentPin ? "text" : "password"}
-                            value="1234"
-                            readOnly
-                            className="w-full rounded-full bg-white/70 py-3 pl-6 pr-14 text-center text-xl tracking-[0.35em] text-[#d46a1a] outline-none"
-                          />
-                          <button
-                            onClick={() => setShowCurrentPin((prev) => !prev)}
-                            className="absolute inset-y-0 right-4 flex items-center text-[#d46a1a] transition hover:opacity-80"
-                          >
-                            {showCurrentPin ? (
-                              <EyeOff className="h-6 w-6" />
-                            ) : (
-                              <Eye className="h-6 w-6" />
-                            )}
-                          </button>
+                    {locker && (
+                      <div className="rounded-[1.5rem] bg-[#f3dfd0] px-4 py-4 md:px-5">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="min-w-0">
+                            <h3 className="text-xl font-extrabold text-[#d46a1a] md:text-2xl">
+                              Current PIN
+                            </h3>
+                            <p className="text-sm text-[#d46a1a] md:text-base">
+                              Used to open the PadaBox for parcel retrieval.
+                            </p>
+                          </div>
+
+                          <div className="relative w-full lg:max-w-[320px]">
+                            <input
+                              type={showCurrentPin ? "text" : "password"}
+                              value={showCurrentPin ? 
+                                (locker?.pin || "••••") : 
+                                formatPinDisplay(locker?.pin)
+                              }
+                              readOnly
+                              className="w-full rounded-full bg-white/70 py-3 pl-6 pr-14 text-center text-xl tracking-[0.35em] text-[#d46a1a] outline-none"
+                              placeholder="No PIN set"
+                            />
+                            <button
+                              onClick={() => setShowCurrentPin((prev) => !prev)}
+                              disabled={!locker?.pin}
+                              className={`absolute inset-y-0 right-4 flex items-center transition hover:opacity-80 ${
+                                !locker?.pin ? 'opacity-50 cursor-not-allowed text-[#d46a1a]/50' : 'text-[#d46a1a]'
+                              }`}
+                            >
+                              {showCurrentPin ? (
+                                <EyeOff className="h-6 w-6" />
+                              ) : (
+                                <Eye className="h-6 w-6" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Change PIN Card */}
-                  {showChangePinCard && (
+                  {showChangePinCard && locker && (
                     <div className="rounded-[1.75rem] bg-[#e7b8c8]/85 p-4 md:p-5">
                       <div className="mb-5 flex items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#de517e]">
@@ -423,24 +616,25 @@ export default function AccountPage() {
                       <div className="relative flex flex-col gap-4">
                         <div className="absolute bottom-10 left-[1.7rem] top-10 hidden w-[2px] bg-[#de517e]/65 md:block" />
 
-                        <div className="relative flex flex-col gap-3 md:flex-row md:items-center">
-                          <div className="z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white">
+                        <div className={`relative flex flex-col gap-3 md:flex-row md:items-center ${step !== 1 ? 'opacity-50' : ''}`}>
+                          <div className={`z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white ${step > 1 ? 'ring-2 ring-[#de517e]/50 bg-[#de517e]/80' : ''}`}>
                             1
                           </div>
-
                           <div className="flex-1 rounded-[1.5rem] bg-white/65 px-4 py-4 md:px-6">
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                               <p className="text-lg font-extrabold text-[#de517e] md:text-2xl">
                                 Enter current 4-digit PIN
                               </p>
-
                               <div className="relative w-full lg:w-[360px]">
                                 <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#de517e]" />
                                 <input
                                   type={showOldPin ? "text" : "password"}
                                   maxLength={4}
+                                  value={currentPin}
+                                  onChange={(e) => setCurrentPin(e.target.value)}
                                   placeholder="Enter 4-digit PIN"
-                                  className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg"
+                                  disabled={step !== 1}
+                                  className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg disabled:opacity-50"
                                 />
                                 <button
                                   type="button"
@@ -455,28 +649,38 @@ export default function AccountPage() {
                                 </button>
                               </div>
                             </div>
+                            {step === 1 && (
+                              <button 
+                                onClick={handleVerifyCurrentPin}
+                                disabled={currentPin.length !== 4 || updatingPin}
+                                className="mt-4 w-full rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg disabled:opacity-50"
+                              >
+                                Next
+                              </button>
+                            )}
                           </div>
                         </div>
 
-                        <div className="relative flex flex-col gap-3 md:flex-row md:items-center">
-                          <div className="z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white">
+                        <div className={`relative flex flex-col gap-3 md:flex-row md:items-center ${step !== 2 ? 'opacity-50' : ''}`}>
+                          <div className={`z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white ${step > 2 ? 'ring-2 ring-[#de517e]/50 bg-[#de517e]/80' : ''}`}>
                             2
                           </div>
-
                           <div className="flex-1 rounded-[1.5rem] bg-white/65 px-4 py-4 md:px-6">
                             <div className="flex flex-col gap-4">
                               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                                 <p className="text-lg font-extrabold text-[#de517e] md:text-2xl">
-                                  Send verification code to email
+                                  {codeSent ? 'Enter verification code' : 'Send verification code to email'}
                                 </p>
-
                                 <div className="relative w-full lg:w-[360px]">
                                   <Send className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#de517e]" />
                                   <input
                                     type={showCode ? "text" : "password"}
                                     maxLength={6}
-                                    placeholder="Enter 6-digit code"
-                                    className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg"
+                                    value={verificationCode}
+                                    onChange={(e) => setVerificationCode(e.target.value)}
+                                    placeholder={codeSent ? "Enter 6-digit code" : "Code will appear here"}
+                                    disabled={step !== 2 || !codeSent}
+                                    className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg disabled:opacity-50"
                                   />
                                   <button
                                     type="button"
@@ -491,37 +695,57 @@ export default function AccountPage() {
                                   </button>
                                 </div>
                               </div>
-                            </div>
-
-                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                              <button className="rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg">
-                                Send Code
-                              </button>
-                              <button className="rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg">
-                                Verify
-                              </button>
+                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {!codeSent ? (
+                                  <button 
+                                    onClick={handleSendVerificationCode}
+                                    disabled={updatingPin}
+                                    className="rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg disabled:opacity-50"
+                                  >
+                                    Send Code
+                                  </button>
+                                ) : (
+                                  <button 
+                                    onClick={handleVerifyCode}
+                                    disabled={verificationCode.length !== 6 || updatingPin}
+                                    className="rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg disabled:opacity-50"
+                                  >
+                                    Verify
+                                  </button>
+                                )}
+                                {codeSent && (
+                                  <button 
+                                    onClick={handleResendCode}
+                                    disabled={updatingPin}
+                                    className="rounded-full border-2 border-[#de517e] bg-transparent px-6 py-3 text-base font-extrabold text-[#de517e] transition hover:bg-[#de517e] hover:text-white md:text-lg"
+                                  >
+                                    Resend
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="relative flex flex-col gap-3 md:flex-row md:items-center">
-                          <div className="z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white">
+                        <div className={`relative flex flex-col gap-3 md:flex-row md:items-center ${step !== 3 ? 'opacity-50' : ''}`}>
+                          <div className={`z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white ${step > 3 ? 'ring-2 ring-[#de517e]/50 bg-[#de517e]/80' : ''}`}>
                             3
                           </div>
-
                           <div className="flex-1 rounded-[1.5rem] bg-white/65 px-4 py-4 md:px-6">
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                               <p className="text-lg font-extrabold text-[#de517e] md:text-2xl">
                                 Enter New PIN
                               </p>
-
                               <div className="relative w-full lg:w-[360px]">
                                 <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#de517e]" />
                                 <input
                                   type={showNewPin ? "text" : "password"}
                                   maxLength={4}
+                                  value={newPin}
+                                  onChange={(e) => setNewPin(e.target.value)}
                                   placeholder="Enter new 4-digit PIN"
-                                  className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg"
+                                  disabled={step !== 3}
+                                  className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg disabled:opacity-50"
                                 />
                                 <button
                                   type="button"
@@ -536,27 +760,37 @@ export default function AccountPage() {
                                 </button>
                               </div>
                             </div>
+                            {step === 3 && (
+                              <button 
+                                onClick={() => setStep(4)}
+                                disabled={newPin.length !== 4 || updatingPin}
+                                className="mt-4 w-full rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg disabled:opacity-50"
+                              >
+                                Next
+                              </button>
+                            )}
                           </div>
                         </div>
 
-                        <div className="relative flex flex-col gap-3 md:flex-row md:items-center">
-                          <div className="z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white">
+                        <div className={`relative flex flex-col gap-3 md:flex-row md:items-center ${step !== 4 ? 'opacity-50' : ''}`}>
+                          <div className="z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#de517e] text-xl font-extrabold text-white ring-2 ring-[#de517e]/50 bg-[#de517e]/80">
                             4
                           </div>
-
                           <div className="flex-1 rounded-[1.5rem] bg-white/65 px-4 py-4 md:px-6">
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                               <p className="text-lg font-extrabold text-[#de517e] md:text-2xl">
                                 Confirm New PIN
                               </p>
-
                               <div className="relative w-full lg:w-[360px]">
                                 <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#de517e]" />
                                 <input
                                   type={showConfirmPin ? "text" : "password"}
                                   maxLength={4}
+                                  value={confirmPin}
+                                  onChange={(e) => setConfirmPin(e.target.value)}
                                   placeholder="Confirm new PIN"
-                                  className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg"
+                                  disabled={step !== 4}
+                                  className="h-14 w-full rounded-full bg-[#f7f7f7] pl-12 pr-14 text-base text-[#de517e] outline-none placeholder:text-[#e08ca8] md:text-lg disabled:opacity-50"
                                 />
                                 <button
                                   type="button"
@@ -574,11 +808,27 @@ export default function AccountPage() {
                           </div>
                         </div>
 
-                        <div className="pt-1">
-                          <button className="w-full rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg">
-                            Update PIN
-                          </button>
-                        </div>
+                        {step === 4 && (
+                          <div className="pt-1">
+                            <button 
+                              onClick={handleUpdatePin}
+                              disabled={newPin.length !== 4 || confirmPin.length !== 4 || newPin !== confirmPin || updatingPin}
+                              className="w-full rounded-full bg-[#de517e] px-6 py-3 text-base font-extrabold text-white transition hover:opacity-90 md:text-lg disabled:opacity-50"
+                            >
+                              {updatingPin ? (
+                                <>
+                                  <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                                  Updating PIN...
+                                </>
+                              ) : (
+                                'Update PIN'
+                              )}
+                            </button>
+                            {newPin !== confirmPin && newPin.length === 4 && confirmPin.length === 4 && (
+                              <p className="mt-2 text-sm text-red-400 text-center">PINs do not match</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

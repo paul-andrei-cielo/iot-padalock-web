@@ -22,7 +22,6 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    pin: String,
     lockerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Locker",
@@ -43,6 +42,14 @@ const UserSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    pinVerificationCode: {
+      type: String,
+      default: null
+    },
+    pinVerificationCodeExpires: {
+      type: Date,
+      default: null
+    }
   },
   {
     timestamps: true,
