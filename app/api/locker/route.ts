@@ -13,7 +13,14 @@ export async function GET(request: NextRequest) {
     const userId = new mongoose.Types.ObjectId(user.id || user.userId);
 
     const lockers = await Locker.find({ userId }).populate('userId');
+
+    // 🔥 ADD THIS
+    if (lockers.length > 0) {
+      console.log("LOCKER CODE:", lockers[0].code);
+    }
+
     return NextResponse.json(lockers);
+
   } catch (error: any) {
     console.error('Error fetching lockers:', error);
     return NextResponse.json(
@@ -27,27 +34,20 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
     
-    const body = await request.json();
-    const { userId, code } = body;
+    const user = getUserFromRequest(request);
+    const userId = new mongoose.Types.ObjectId(user.id || user.userId);
 
-    if (!userId || !code) {
+    const body = await request.json();
+    const { code } = body;
+
+    if (!code) {
       return NextResponse.json(
-        { error: 'userId and code are required' }, 
+        { error: 'code is required' }, 
         { status: 400 }
       );
     }
 
-    const objectId = new mongoose.Types.ObjectId(userId);
-
-    const userExists = await User.findById(objectId);
-    if (!userExists) {
-      return NextResponse.json(
-        { error: 'User not found' }, 
-        { status: 404 }
-      );
-    }
-
-    const existingLocker = await Locker.findOne({ userId: objectId });
+    const existingLocker = await Locker.findOne({ userId });
     if (existingLocker) {
       return NextResponse.json(
         { error: 'User already has a locker' }, 
@@ -56,20 +56,16 @@ export async function POST(request: NextRequest) {
     }
 
     const locker = new Locker({
-      userId: objectId,
-      code
+      userId,
+      code,
+      pin: "0000"
     });
 
     await locker.save();
-    
-    await User.findByIdAndUpdate(objectId, { 
-      lockerId: locker._id 
-    });
-    
-    console.log('Locker created:', locker._id);
+    console.log("LOCKER CODE:", locker.code);
     return NextResponse.json(locker, { status: 201 });
+
   } catch (error: any) {
-    console.error('Error creating locker:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create locker' }, 
       { status: 500 }

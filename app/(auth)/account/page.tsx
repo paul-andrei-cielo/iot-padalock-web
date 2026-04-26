@@ -48,7 +48,6 @@ export default function AccountPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteEmail, setDeleteEmail] = useState("");
 
-  // Locker state
   const [locker, setLocker] = useState<any>(null);
   const [lockerLoading, setLockerLoading] = useState(true);
 
@@ -59,7 +58,6 @@ export default function AccountPage() {
   const [showNewPin, setShowNewPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
 
-  // Change PIN state
   const [currentPin, setCurrentPin] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [newPin, setNewPin] = useState("");
@@ -67,7 +65,7 @@ export default function AccountPage() {
   const [codeSent, setCodeSent] = useState(false);
   const [codeVerified, setCodeVerified] = useState(false);
   const [updatingPin, setUpdatingPin] = useState(false);
-  const [step, setStep] = useState(1); // 1: current PIN, 2: verification, 3: new PIN, 4: confirm
+  const [step, setStep] = useState(1); 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,7 +74,6 @@ export default function AccountPage() {
     fetchData();
   }, []);
 
-  // Reset form when toggling change PIN card
   useEffect(() => {
     if (!showChangePinCard) {
       setStep(1);
@@ -117,34 +114,58 @@ export default function AccountPage() {
     }
   };
 
-  const fetchLocker = async () => {
-    try {
-      setLockerLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/locker", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    const fetchLocker = async () => {
+      try {
+        console.log("TOKEN:", localStorage.getItem("token"));
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch locker");
+        setLockerLoading(true);
+        const token = localStorage.getItem("token");
+
+        const response = await fetch("/api/locker", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch locker");
+        }
+
+        const data = await response.json();
+
+        if (data.length === 0) {
+          await fetch("/api/locker", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              code: "LOCKER_" + Date.now(),
+            }),
+          });
+
+          const res2 = await fetch("/api/locker", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const newData = await res2.json();
+          setLocker(newData.length > 0 ? newData[0] : null);
+        } else {
+          setLocker(data[0]);
+        }
+
+      } catch (err: any) {
+        console.error("Locker fetch error:", err);
+        setLocker(null);
+      } finally {
+        setLockerLoading(false);
       }
-
-      const data = await response.json();
-      setLocker(data.length > 0 ? data[0] : null);
-    } catch (err: any) {
-      console.error("Locker fetch error:", err);
-      setLocker(null);
-    } finally {
-      setLockerLoading(false);
-    }
-  };
+    };
 
   const formatPinDisplay = (pin: string | number | undefined) => {
     if (!pin) return "••••";
     return pin.toString().padStart(4, "0");
   };
 
-  // Change PIN handlers
   const handleVerifyCurrentPin = async () => {
     if (currentPin !== locker?.pin) {
       alert("Current PIN is incorrect");

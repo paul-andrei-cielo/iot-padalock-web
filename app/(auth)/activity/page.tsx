@@ -263,7 +263,34 @@ export default function ActivityPage() {
     return activities.filter((item) => item.status === activeFilter);
   }, [activeFilter, activities]);
 
-  const formattedAuditLogs = useMemo(() => {
+
+  const formatLogEvent = (log: Log): string => {
+  switch (log.action) {
+
+    case "PIN_VALID":
+      return "Valid PIN entered";
+
+    case "DELIVERY_VALID":
+      return "Delivery code accepted";
+
+    case "LOCK_OPEN":
+      return "Lock opened";
+
+    case "LOCK_CLOSED":
+      return "Lock closed";
+
+    case "PARCEL_DETECTED":
+      return "Parcel detected";
+
+    case "PARCEL_REMOVED":
+      return "Parcel removed";
+
+    default:
+      return log.action || "Unknown";
+  }
+};
+
+    const formattedAuditLogs = useMemo(() => {
     return logs.map((log) => ({
       id: log._id,
       date: formatDate(log.timestamp),
@@ -272,32 +299,6 @@ export default function ActivityPage() {
     })).slice(0, 20);
   }, [logs]);
 
-  const formatLogEvent = (log: Log): string => {
-    const { actor, action, success, details } = log;
-    
-    if (!success) {
-      return "Failed PIN attempt";
-    }
-
-    switch (action) {
-      case "PIN_ENTERED":
-        return actor === "user" ? "Valid PIN entered" : "Courier access granted";
-      case "LID_OPENED":
-        return actor === "user" ? "Lid opened (PIN)" : "Lid opened (Courier)";
-      case "LID_CLOSED":
-        return "Lid closed";
-      case "LOCK_ENGAGED":
-        return "Lock engaged";
-      case "PARCEL_DETECTED":
-        return "Parcel detected";
-      case "PIN_LOCKOUT":
-        return "PIN lockout activated";
-      case "PIN_RESET":
-        return "PIN lockout reset";
-      default:
-        return `${action} by ${actor}`;
-    }
-  };
 
   if (loading) {
     return (
