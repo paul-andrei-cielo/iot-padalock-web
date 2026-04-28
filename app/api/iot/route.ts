@@ -19,16 +19,49 @@ export async function POST(req: NextRequest) {
     // LOG FROM ESP32
     // =========================
     if (status) {
-      const locker = await Locker.findOne({ code: lockerCode });
+  const locker = await Locker.findOne({ code: lockerCode });
 
-      await Log.create({
-        actor: "iot",
-        action: status,
-        success: true,
-        userId: locker?.userId || null,
-        lockerCode: lockerCode || null,
-        timestamp: new Date(),
-      });
+  await Log.create({
+    actor: "iot",
+    action: status,
+    success: true,
+    userId: locker?.userId || null,
+    lockerCode: lockerCode || null,
+    timestamp: new Date(),
+  });
+
+      if (status === "PARCEL_REMOVED" && locker) {
+        let result = await Parcel.updateMany(
+          {
+            userId: locker.userId,
+            status: "DELIVERED",
+          },
+          {
+            $set: {
+              status: "RETRIEVED",
+              retrievedDate: new Date(),
+            },
+          }
+        );
+
+        // fallback if not delivered yet
+        if (result.modifiedCount === 0) {
+          result = await Parcel.updateMany(
+            {
+              userId: locker.userId,
+              status: "PENDING",
+            },
+            {
+              $set: {
+                status: "RETRIEVED",
+                retrievedDate: new Date(),
+              },
+            }
+          );
+        }
+
+        console.log("SENSOR UPDATED:", result.modifiedCount);
+      }
 
       return NextResponse.json({ ok: true });
     }

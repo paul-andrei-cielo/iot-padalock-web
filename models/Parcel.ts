@@ -6,6 +6,10 @@ const ParcelSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
+    ownerPin: {
+        type: String,
+        required: false
+    },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",

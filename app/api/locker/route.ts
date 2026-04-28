@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
 
     const lockers = await Locker.find({ userId }).populate('userId');
 
-    // 🔥 ADD THIS
     if (lockers.length > 0) {
       console.log("LOCKER CODE:", lockers[0].code);
     }
