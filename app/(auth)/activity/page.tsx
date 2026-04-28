@@ -30,14 +30,6 @@ interface Log {
   timestamp: string;
 }
 
-interface Locker {
-  _id: string;
-  code: string;
-  status: string;
-  failedPinAttempts: number;
-  lockout: boolean;
-}
-
 interface ActivityItem {
   id: string;
   trackingNumber: string;
@@ -55,7 +47,6 @@ const navItems = [
 
 const API_BASE = "/api/parcels";
 const LOGS_API = "/api/logs";
-const LOCKER_API = "/api/locker";
 
 const statusStyles: Record<
   ParcelStatus,
@@ -91,7 +82,6 @@ export default function ActivityPage() {
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("ALL");
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
-  const [locker, setLocker] = useState<Locker | null>(null);
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -174,31 +164,10 @@ export default function ActivityPage() {
     }
   };
 
-  const fetchLocker = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const res = await fetch(LOCKER_API, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setLocker(data);
-      }
-    } catch (err) {
-      console.error("Error fetching locker:", err);
-    }
-  };
-
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     if (mode === "AUDIT_LOGS") {
       fetchLogs();
-      fetchLocker();
     }
   };
 
@@ -501,31 +470,6 @@ export default function ActivityPage() {
             ) : (
               <div className="flex-1 min-h-0 pb-3">
                 <div className="flex h-full min-h-0 flex-col rounded-[2rem] bg-white/20 p-3">
-                  {locker && (
-                    <div className="mb-4 rounded-[1.5rem] bg-white/40 p-4 shadow-lg">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-white/80 mb-1">Locker Status</p>
-                          <p className="text-xl font-extrabold text-white">
-                            {locker.status === "locked" ? "🔒 Locked" : "🔓 Unlocked"}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-sm text-white/80">Failed Attempts</p>
-                            <p className="text-2xl font-extrabold text-[#de517e]">
-                              {locker.failedPinAttempts}
-                            </p>
-                          </div>
-                          {locker.lockout && (
-                            <span className="inline-block rounded-full bg-red-400/60 px-3 py-1 text-xs font-bold text-white">
-                              LOCKED OUT
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="mb-3 grid grid-cols-[1.1fr_0.75fr_2fr] gap-3 rounded-[1.5rem] bg-white/35 px-5 py-4 text-sm font-extrabold uppercase tracking-wide text-[#de517e] md:px-6 md:text-base">
                     <p>Date</p>
