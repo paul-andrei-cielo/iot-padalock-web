@@ -20,6 +20,12 @@ const ParcelSchema = new mongoose.Schema({
         type: String,
         default: "Parcel"
     },
+    lockerCode: {
+        type: String,
+        required: false,
+        index: true
+    },
+
     status: {
         type: String,
         enum: ["PENDING", "DELIVERED", "RETRIEVED"],

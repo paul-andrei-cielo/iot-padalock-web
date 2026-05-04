@@ -6,20 +6,23 @@ import { getUserFromRequest } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    
+
     const user = getUserFromRequest(request);
     const userId = user.id || user.userId;
 
     const logs = await Log.find({
       $or: [
-        { userId },        // user logs
-        { actor: "iot" }   // ESP logs
+        { userId: userId },
+        { actor: { $in: ["SENSOR", "OWNER", "USER", "COURIER", "SYSTEM"] } }
       ]
     })
     .sort({ timestamp: -1 })
     .limit(50);
 
+    console.log("LOGS FOUND:", logs.length);
+
     return NextResponse.json(logs);
+
   } catch (error: any) {
     console.error('Error fetching logs:', error);
     return NextResponse.json(
