@@ -253,6 +253,12 @@ export default function ActivityPage() {
 
     case "PARCEL_REMOVED":
       return "Parcel removed";
+      
+    case "AUTO_LOCK_TIMEOUT":
+      return "Auto lock timeout";
+
+    case "INVALID_CODE":
+      return "Invalid code entered";
 
     default:
       return log.action || "Unknown";

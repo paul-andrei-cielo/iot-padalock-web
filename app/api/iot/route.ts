@@ -61,6 +61,24 @@ export async function POST(req: NextRequest) {
         console.log("SENSOR UPDATED:", result.modifiedCount);
       }
 
+      if (status === "PARCEL_DETECTED" && locker) {
+
+        await Parcel.updateMany(
+          {
+            userId: locker.userId,
+            status: "PENDING",
+          },
+          {
+            $set: {
+              status: "DELIVERED",
+              deliveryDate: new Date(),
+            },
+          }
+        );
+
+        console.log("PARCEL MARKED AS DELIVERED");
+      }
+
       return NextResponse.json({ ok: true });
     }
 
@@ -79,87 +97,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing code" }, { status: 400 });
     }
 
-    const inputCode = String(code);
-
     // =========================
     // OWNER
     // =========================
-    if (locker.pin === inputCode) {
-      const result = await Parcel.updateMany(
-        { lockerCode },
-        {
-          $set: {
-            status: "RETRIEVED",
-            retrievedDate: new Date(),
-          },
-        }
-      );
-
-      await Log.create({
-        lockerId: locker._id,
-        actor: "OWNER",
-        action: "RETRIEVE",
-        success: true,
-        timestamp: new Date(),
-      });
-
-      console.log("OWNER UPDATED:", result.modifiedCount);
-
-      return NextResponse.json({ mode: "OWNER" });
-    }
-
-    // =========================
-    // RETRIEVE
-    // =========================
-    const retrieveParcel = await Parcel.findOne({
-      trackingNumber: inputCode,
-      status: "DELIVERED",
-    });
-
-    if (retrieveParcel) {
-      retrieveParcel.status = "RETRIEVED";
-      retrieveParcel.retrievedDate = new Date();
-      await retrieveParcel.save();
-
-      await Log.create({
-        lockerId: locker._id,
-        actor: "USER",
-        action: "RETRIEVE",
-        success: true,
-        timestamp: new Date(),
-      });
-
-      console.log("RETRIEVED:", retrieveParcel.trackingNumber);
-
-      return NextResponse.json({ mode: "RETRIEVAL" });
-    }
-
-    // =========================
-    // DELIVERY
-    // =========================
     const parcel = await Parcel.findOne({
-      trackingNumber: inputCode,
+      trackingNumber: code,
       status: "PENDING",
     });
 
     if (parcel) {
-      parcel.status = "DELIVERED";
-      parcel.deliveryDate = new Date();
-      parcel.set("lockerCode", lockerCode);
-
-      await parcel.save();
-
-      await Log.create({
-        lockerId: locker._id,
-        actor: "COURIER",
-        action: "DELIVER",
-        success: true,
-        timestamp: new Date(),
-      });
-
-      console.log("DELIVERED:", parcel.trackingNumber);
-
       return NextResponse.json({ mode: "DELIVERY" });
+    }
+
+      if (locker.pin === String(code)) {
+      return NextResponse.json({ mode: "OWNER" });
     }
 
     // =========================
