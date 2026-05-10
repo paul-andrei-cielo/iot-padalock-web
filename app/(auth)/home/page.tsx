@@ -200,10 +200,6 @@ export default function HomePage() {
                     <p className="text-5xl font-light text-[#df4473] md:text-6xl lg:text-7xl">
                       {formatNumber(stats.retrieved)}
                     </p>
-                    <div className="mt-2 flex w-full max-w-[120px] items-center justify-between rounded-full bg-white/50 px-3 py-1 text-xs text-[#df4473] group-hover:bg-white/70 transition-all">
-                      <span>Today</span>
-                      <span>˅</span>
-                    </div>
                   </div>
                 </div>
               </div>
